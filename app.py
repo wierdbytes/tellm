@@ -98,8 +98,9 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
     # Определяем роль: если сообщение от бота - assistant, иначе user
     role = "assistant" if message.from_user and message.from_user.is_bot else "user"
     full_content = (message.text or message.caption or "")
-    content = (message.text or message.caption or "").replace(BOT_USERNAME, "").strip()
+    content = (message.text or message.caption or "").replace(f"@{BOT_USERNAME.lower()}", "").strip()
     reply_to_message_id = message.reply_to_message.message_id if message.reply_to_message else None
+    reply_to = message.message_id
 
     # Сохраняем ВСЕ сообщения в БД
     await save_message(
@@ -131,6 +132,8 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
             # Если по каким-то причинам это бот, игнорируем (но такого не случится обычно)
             if role == "user" and content != "":
                 conversation.append({"role": "user", "content": content})
+            elif content == "":
+                reply_to = message.reply_to_message.message_id
         else:
             # Если просто упомянули бота, но не ответили на его сообщение, начинаем новую ветку
             conversation = [{"role": "user", "content": content}]
@@ -146,12 +149,12 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
             logging.error(e)
             answer = "Произошла ошибка при запросе к модели."
 
-        sent_message = await message.reply_text(answer)
+        sent_message = await context.bot.sendMessage(chat_id=message.chat_id, reply_to_message_id=reply_to, text=answer)
         # Сохраняем ответ бота
         await save_message(
             chat_id=sent_message.chat_id,
             message_id=sent_message.message_id,
-            reply_to_message_id=message.message_id,
+            reply_to_message_id=reply_to,
             role="assistant",
             content=answer
         )
