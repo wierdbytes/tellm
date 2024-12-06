@@ -1,8 +1,6 @@
 import asyncio
 import os
 import logging
-import sqlite3
-from contextlib import closing
 import aiosqlite
 from functools import wraps
 
@@ -180,6 +178,9 @@ def check_allowed_chat():
 
 if __name__ == "__main__":
     try:
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(init_db())
+
         bot = ApplicationBuilder().token(BOT_TOKEN).build()
         bot.add_handler(CommandHandler("start", check_allowed_chat()(start_command)))
         bot.add_handler(MessageHandler(filters.ALL, check_allowed_chat()(handle_message)))
