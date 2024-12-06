@@ -1,0 +1,6 @@
+services:
+  bot:
+    environment:
+      TELEGRAM_BOT_TOKEN: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      OPENAI_API_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      ALLOWED_CHAT_IDS: "1234567890,-1234567891"
