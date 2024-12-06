@@ -97,7 +97,8 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
 
     # Определяем роль: если сообщение от бота - assistant, иначе user
     role = "assistant" if message.from_user and message.from_user.is_bot else "user"
-    content = message.text or message.caption or ""
+    full_content = (message.text or message.caption or "")
+    content = (message.text or message.caption or "").replace(BOT_USERNAME, "").strip()
     reply_to_message_id = message.reply_to_message.message_id if message.reply_to_message else None
 
     # Сохраняем ВСЕ сообщения в БД
@@ -112,14 +113,14 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
     # Проверяем, нужно ли отправлять запрос к модели:
     # 1. Если сообщение упоминает бота (@username)
     # 2. Или если сообщение является ответом на сообщение бота
-    mention_bot = f"@{BOT_USERNAME.lower()}" in content.lower()
+    mention_bot = f"@{BOT_USERNAME.lower()}" in full_content.lower()
     replying_to_bot = (message.reply_to_message and message.reply_to_message.from_user and message.reply_to_message.from_user.username == BOT_USERNAME)
 
     if mention_bot or replying_to_bot or message.chat.type == "private":
         # Отправляем "печатает..."
         await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
-        if replying_to_bot:
+        if replying_to_bot or (mention_bot and message.reply_to_message):
             # Получаем всю ветку сообщений для контекста
             conversation = await get_conversation_chain(
                 chat_id=message.chat_id,
@@ -128,14 +129,11 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
             # Добавляем текущее сообщение пользователя в конец
             # Текущее сообщение - всегда user (т.к. обращаются к боту)
             # Если по каким-то причинам это бот, игнорируем (но такого не случится обычно)
-            if role == "user":
-                # Заменим контент, убрав упоминание бота, если оно есть
-                user_message = content.replace(BOT_USERNAME, "").strip()
-                conversation.append({"role": "user", "content": user_message})
+            if role == "user" and content != "":
+                conversation.append({"role": "user", "content": content})
         else:
             # Если просто упомянули бота, но не ответили на его сообщение, начинаем новую ветку
-            user_message = content.replace(BOT_USERNAME, "").strip()
-            conversation = [{"role": "user", "content": user_message}]
+            conversation = [{"role": "user", "content": content}]
 
         # Запрос к OpenAI
         try:
