@@ -145,19 +145,43 @@ async def handle_message(update: telegram.Update, context: ContextTypes.DEFAULT_
                 messages=conversation
             )
             answer = response.choices[0].message.content.strip()
+            
+            # Break long messages into chunks of 4096 characters (Telegram's limit)
+            max_length = 4096
+            message_chunks = [answer[i:i+max_length] for i in range(0, len(answer), max_length)]
+            
+            last_message_id = reply_to
+            for chunk in message_chunks:
+                sent_message = await context.bot.sendMessage(
+                    chat_id=message.chat_id, 
+                    reply_to_message_id=last_message_id, 
+                    text=chunk
+                )
+                # Save each chunk to the database
+                await save_message(
+                    chat_id=sent_message.chat_id,
+                    message_id=sent_message.message_id,
+                    reply_to_message_id=last_message_id,
+                    role="assistant",
+                    content=chunk
+                )
+                last_message_id = sent_message.message_id
+                
         except Exception as e:
             logging.error(e)
             answer = "Произошла ошибка при запросе к модели."
-
-        sent_message = await context.bot.sendMessage(chat_id=message.chat_id, reply_to_message_id=reply_to, text=answer)
-        # Сохраняем ответ бота
-        await save_message(
-            chat_id=sent_message.chat_id,
-            message_id=sent_message.message_id,
-            reply_to_message_id=reply_to,
-            role="assistant",
-            content=answer
-        )
+            sent_message = await context.bot.sendMessage(
+                chat_id=message.chat_id, 
+                reply_to_message_id=reply_to, 
+                text=answer
+            )
+            await save_message(
+                chat_id=sent_message.chat_id,
+                message_id=sent_message.message_id,
+                reply_to_message_id=reply_to,
+                role="assistant",
+                content=answer
+            )
 
 async def start_command(update: telegram.Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Бот запущен. Пишите запросы, упоминая меня в групповом чате, или отвечайте на мои сообщения.")
